@@ -996,7 +996,7 @@ class ThreadUtil(S3Handler, ThreadPool.Worker):
     # Initialization: Set up multithreaded uploads.
     if not mpi:
       fsize = os.path.getsize(source)
-      key = bucket.get_key(s3url.path)
+      key = bucket.get_key(s3url.path.decode('utf-8'))
 
       # optional checks
       if self.opt.dry_run:
@@ -1011,7 +1011,7 @@ class ThreadUtil(S3Handler, ThreadPool.Worker):
       # Small file optimization.
       if fsize < self.opt.max_singlepart_upload_size:
         key = boto.s3.key.Key(bucket)
-        key.key = s3url.path
+        key.key = s3url.path.decode('utf-8')
         key.set_metadata('privilege',  self.get_file_privilege(source))
         key.set_contents_from_filename(source)
         message('%s => %s', source, target)
@@ -1019,7 +1019,7 @@ class ThreadUtil(S3Handler, ThreadPool.Worker):
 
       # Here we need to have our own md5 value because multipart upload calculates
       # different md5 values.
-      mpu = bucket.initiate_multipart_upload(s3url.path, metadata = {'md5': self.file_hash(source), 'privilege': self.get_file_privilege(source)})
+      mpu = bucket.initiate_multipart_upload(s3url.path.decode('utf-8'), metadata = {'md5': self.file_hash(source), 'privilege': self.get_file_privilege(source)})
 
       for args in self.get_file_splits(mpu.id, source, target, fsize, self.opt.multipart_split_size):
         self.pool.upload(*args)
@@ -1061,7 +1061,7 @@ class ThreadUtil(S3Handler, ThreadPool.Worker):
   @log_calls
   def _kick_off_downloads(self, s3url, bucket, source, target):
     '''Kick off download tasks, or directly download the file if the file is small.'''
-    key = bucket.get_key(s3url.path)
+    key = bucket.get_key(s3url.path.decode('utf-8'))
 
     # optional checks
     if self.opt.dry_run:
@@ -1074,7 +1074,7 @@ class ThreadUtil(S3Handler, ThreadPool.Worker):
       raise Failure('File already exists: %s' % target)
 
     if key is None:
-      raise Failure('The key "%s" does not exists.' % (s3url.path,))
+      raise Failure('The key "%s" does not exists.' % (s3url.path.decode('utf-8'),))
 
     resp = self.s3.make_request('HEAD', bucket = bucket, key = key)
     fsize = int(resp.getheader('content-length'))
@@ -1118,7 +1118,7 @@ class ThreadUtil(S3Handler, ThreadPool.Worker):
       self.mkdirs(tempfile)
 
     # Download part of the file, range is inclusive.
-    resp = self.s3.make_request('GET', bucket = s3url.bucket, key = s3url.path, headers = {'Range': 'bytes=%d-%d' % (pos, pos + chunk - 1)})
+    resp = self.s3.make_request('GET', bucket = s3url.bucket, key = s3url.path.decode('utf-8'), headers = {'Range': 'bytes=%d-%d' % (pos, pos + chunk - 1)})
     fd = os.open(tempfile, os.O_CREAT | os.O_WRONLY)
     try:
       os.lseek(fd, pos, os.SEEK_SET)
@@ -1133,7 +1133,7 @@ class ThreadUtil(S3Handler, ThreadPool.Worker):
 
     # Finalize
     if mpi.complete():
-      key = bucket.get_key(s3url.path)
+      key = bucket.get_key(s3url.path.decode('utf-8'))
       try:
         self.update_privilege(source, tempfile)
         self._verify_file_size(key, tempfile)
@@ -1168,7 +1168,7 @@ class ThreadUtil(S3Handler, ThreadPool.Worker):
     '''Thread worker for download operation.'''
     s3url = S3URL(source)
     bucket = self.s3.lookup(s3url.bucket, validate=self.opt.validate)
-    key = bucket.get_key(s3url.path)
+    key = bucket.get_key(s3url.path.decode('utf-8'))
 
     if not self.opt.dry_run:
       key.delete()
